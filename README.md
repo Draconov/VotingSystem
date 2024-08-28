@@ -14,8 +14,10 @@ VotingSystem - это приложение для проведения элек�
 
 - Python 3.9+
 - PyQt5
+- mysql
 - mysql-connector-python
 - cryptography
+- pycryptodome
 
 ## Установка
 
