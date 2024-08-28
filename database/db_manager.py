@@ -1,4 +1,6 @@
 import mysql.connector
+from utils.zkp import ZKP, zkp
+
 
 class DatabaseManager:
     def __init__(self):
@@ -10,6 +12,7 @@ class DatabaseManager:
         )
         self.cursor = self.connection.cursor()
         self.create_tables()
+
 
     def create_tables(self):
         self.cursor.execute("""
@@ -43,6 +46,7 @@ class DatabaseManager:
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT,
             choice BLOB NOT NULL,
+            proof VARCHAR(1000),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
         """)
@@ -65,12 +69,34 @@ class DatabaseManager:
         count = self.cursor.fetchone()[0]
         return count > 0
 
+    '''
     def add_vote(self, user_id, encrypted_choice):
         if self.has_user_voted(user_id):
             raise Exception("User has already voted")
         query = "INSERT INTO votes (user_id, choice) VALUES (%s, %s)"
         self.cursor.execute(query, (user_id, encrypted_choice))
         self.connection.commit()
+    '''
+
+    def add_vote_with_zkp(self, user_id, encrypted_choice):
+        # Генерация доказательства
+        proof = zkp.generate_proof(encrypted_choice)
+
+        # Сохранение зашифрованного выбора и доказательства
+        query = "INSERT INTO votes (user_id, choice, proof) VALUES (%s, %s, %s)"
+        proof_str = f"{proof[0]},{proof[1]}"
+        self.cursor.execute(query, (user_id, encrypted_choice, proof_str))
+        self.connection.commit()
+
+    def verify_vote(self, vote_id):
+        query = "SELECT choice, proof FROM votes WHERE id = %s"
+        self.cursor.execute(query, (vote_id,))
+        result = self.cursor.fetchone()
+        if result:
+            encrypted_choice, proof_str = result
+            r, s = map(int, proof_str.split(','))
+            return zkp.verify_proof(encrypted_choice, (r, s))
+        return False
 
     def get_cities(self):
         query = "SELECT id, name, state_id FROM cities"
@@ -84,7 +110,7 @@ class DatabaseManager:
 
     def get_votes(self):
         query = """
-        SELECT v.id, v.user_id, v.choice, c.name as city_name, s.name as state_name
+        SELECT v.id, v.user_id, v.choice, v.proof, c.name as city_name, s.name as state_name
         FROM votes v
         JOIN users u ON v.user_id = u.id
         JOIN cities c ON u.city_id = c.id

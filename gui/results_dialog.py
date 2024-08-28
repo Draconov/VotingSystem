@@ -25,9 +25,16 @@ class ResultsDialog(QDialog):
         city_results = {}
         state_results = {}
         national_results = {"Republican": 0, "Democrat": 0}
+        invalid_votes = 0
 
         for vote in votes:
-            _, _, encrypted_choice, city_name, state_name = vote
+            vote_id, _, encrypted_choice, _, city_name, state_name = vote
+
+            # Проверка действительности голоса с помощью ZKP
+            if not self.db_manager.verify_vote(vote_id):
+                invalid_votes += 1
+                continue
+
             choice = self.encryption_manager.decrypt(encrypted_choice)
 
             if city_name not in city_results:
@@ -51,7 +58,8 @@ class ResultsDialog(QDialog):
         return {
             "city_results": city_results,
             "state_results": state_results,
-            "national_results": national_results
+            "national_results": national_results,
+            "invalid_votes": invalid_votes
         }
 
     def determine_winner(self, results):
@@ -89,5 +97,7 @@ class ResultsDialog(QDialog):
             output += "\nИтоговый результат: Ничья"
         # winner = max(national, key=national.get)
         # output += f"\nПобедитель: {'Республиканцы' if winner == 'Republican' else 'Демократы'}"
+
+        output += f"\nInvalid votes (failed ZKP verification): {results['invalid_votes']}"
 
         self.results_browser.setText(output)

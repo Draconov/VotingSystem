@@ -39,7 +39,8 @@ class VoteDialog(QDialog):
         encrypted_choice = self.encryption_manager.encrypt(choice)
 
         try:
-            self.db_manager.add_vote(self.user['id'], encrypted_choice)
+            encrypted_choice = self.encryption_manager.encrypt(choice)
+            self.db_manager.add_vote_with_zkp(self.user['id'], encrypted_choice)
             QMessageBox.information(self, "Успех", "Ваш голос учтен")
             self.accept()
         except Exception as e:
